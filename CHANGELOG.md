@@ -1,5 +1,15 @@
 # Changelog — TrekFit Coach
 
+## 1.1.0 — Coach UI foundation
+- Navegação principal reorganizada para Início, Treino, Saúde, Coach e Conta.
+- Nova área Saúde com Resumo, Body, Nutri e Trekking.
+- Nova área Coach com check-in de sono, energia, fome, estresse, recuperação, dor e aderência.
+- Geração de resumo copiável para levar à conversa com o coach no ChatGPT.
+- Perfil local com nome, objetivo e meta semanal de treinos.
+- Tema escuro próprio do TrekFit inspirado em apps fitness premium, sem replicar a identidade da Smart Fit.
+- Atualização do cache PWA para facilitar recebimento de novas versões.
+- Registros anteriores de treino, trekking e medidas continuam preservados.
+
 ## 1.0.0 — Baseline
 - PWA publicada no GitHub Pages.
 - Treinos A–E.
