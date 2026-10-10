@@ -1,16 +1,19 @@
-import type { Measurement, TrekkingLog, WorkoutSession } from './types'
+import type { CoachCheckin, Measurement, Profile, TrekkingLog, WorkoutSession } from './types'
 
 const KEYS = {
   sessions: 'trekfit.sessions',
   trekking: 'trekfit.trekking',
   measurements: 'trekfit.measurements',
-  profile: 'trekfit.profile'
+  profile: 'trekfit.profile',
+  coachCheckins: 'trekfit.coachCheckins'
 }
 
 const read = <T,>(key: string, fallback: T): T => {
   try { return JSON.parse(localStorage.getItem(key) || '') as T } catch { return fallback }
 }
 const write = <T,>(key: string, value: T) => localStorage.setItem(key, JSON.stringify(value))
+
+const defaultProfile: Profile = { name: 'Atleta', goal: 'Performance + composição corporal', weeklyTarget: 5 }
 
 export const storage = {
   getSessions: () => read<WorkoutSession[]>(KEYS.sessions, []),
@@ -19,4 +22,8 @@ export const storage = {
   saveTreks: (v: TrekkingLog[]) => write(KEYS.trekking, v),
   getMeasurements: () => read<Measurement[]>(KEYS.measurements, []),
   saveMeasurements: (v: Measurement[]) => write(KEYS.measurements, v),
+  getCoachCheckins: () => read<CoachCheckin[]>(KEYS.coachCheckins, []),
+  saveCoachCheckins: (v: CoachCheckin[]) => write(KEYS.coachCheckins, v),
+  getProfile: () => read<Profile>(KEYS.profile, defaultProfile),
+  saveProfile: (v: Profile) => write(KEYS.profile, v),
 }

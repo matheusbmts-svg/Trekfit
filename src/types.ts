@@ -1,4 +1,6 @@
-export type Tab = 'home' | 'workout' | 'trekking' | 'progress' | 'nutrition'
+export type Tab = 'home' | 'workout' | 'health' | 'coach' | 'account'
+
+export type HealthSection = 'summary' | 'body' | 'nutrition' | 'trekking'
 
 export type Exercise = {
   id: string
@@ -66,4 +68,23 @@ export type Measurement = {
   waistCm?: number
   hipCm?: number
   thighCm?: number
+}
+
+export type CoachCheckin = {
+  id: string
+  date: string
+  sleepHours: number
+  energy: number
+  hunger: number
+  stress: number
+  recovery: number
+  pain: number
+  adherence: number
+  notes?: string
+}
+
+export type Profile = {
+  name: string
+  goal: string
+  weeklyTarget: number
 }

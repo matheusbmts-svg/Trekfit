@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
 import { workouts, nutritionTarget } from './data'
 import { storage } from './storage'
-import type { ExerciseLog, Measurement, SetLog, Tab, TrekkingLog, WorkoutSession } from './types'
+import HealthHub from './HealthHub'
+import CoachView from './CoachView'
+import AccountView from './AccountView'
+import type { CoachCheckin, ExerciseLog, Measurement, Profile, SetLog, Tab, TrekkingLog, WorkoutSession } from './types'
 
 const todayISO = () => new Date().toISOString().slice(0,10)
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
@@ -41,6 +44,8 @@ export default function App(){
   const [sessions,setSessions]=useState<WorkoutSession[]>(storage.getSessions())
   const [treks,setTreks]=useState<TrekkingLog[]>(storage.getTreks())
   const [measurements,setMeasurements]=useState<Measurement[]>(storage.getMeasurements())
+  const [coachCheckins,setCoachCheckins]=useState<CoachCheckin[]>(storage.getCoachCheckins())
+  const [profile,setProfile]=useState<Profile>(storage.getProfile())
   const [selectedWorkout,setSelectedWorkout]=useState('A')
   const [active,setActive]=useState<WorkoutSession|null>(null)
   const [pain,setPain]=useState(0)
@@ -49,6 +54,8 @@ export default function App(){
   const persistSessions=(v:WorkoutSession[])=>{setSessions(v);storage.saveSessions(v)}
   const persistTreks=(v:TrekkingLog[])=>{setTreks(v);storage.saveTreks(v)}
   const persistMeasurements=(v:Measurement[])=>{setMeasurements(v);storage.saveMeasurements(v)}
+  const persistCoach=(v:CoachCheckin[])=>{setCoachCheckins(v);storage.saveCoachCheckins(v)}
+  const persistProfile=(v:Profile)=>{setProfile(v);storage.saveProfile(v)}
 
   const finishedThisWeek = useMemo(()=>{
     const now=new Date(); const d=(now.getDay()+6)%7; const monday=new Date(now); monday.setDate(now.getDate()-d); monday.setHours(0,0,0,0)
@@ -80,24 +87,24 @@ export default function App(){
 
   return <div className="app-shell">
     <header className="topbar">
-      <div><span className="brand-mark">▲</span><strong>TrekFit</strong></div>
-      <span className="status-pill">PWA</span>
+      <div><span className="brand-mark">▲</span><strong>TrekFit <small>Coach</small></strong></div>
+      <span className="status-pill">v1.1</span>
     </header>
 
     <main>
       {tab==='home' && <Home sessions={sessions} treks={treks} finishedThisWeek={finishedThisWeek} weeklyVolume={weeklyVolume} latestWeight={latestWeight} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} pain={pain} setPain={setPain} radiating={radiating} setRadiating={setRadiating} startWorkout={startWorkout}/>} 
       {tab==='workout' && <WorkoutView active={active} sessions={sessions} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} startWorkout={startWorkout} updateSet={updateSet} finishWorkout={finishWorkout}/>} 
-      {tab==='trekking' && <TrekkingView treks={treks} onSave={(t)=>persistTreks([t,...treks])}/>} 
-      {tab==='progress' && <ProgressView measurements={measurements} sessions={sessions} onSave={(m)=>persistMeasurements([m,...measurements])}/>} 
-      {tab==='nutrition' && <NutritionView/>}
+      {tab==='health' && <HealthHub measurements={measurements} sessions={sessions} treks={treks} onSaveMeasurement={(m)=>persistMeasurements([m,...measurements])} onSaveTrek={(t)=>persistTreks([t,...treks])}/>} 
+      {tab==='coach' && <CoachView checkins={coachCheckins} onSave={(v)=>persistCoach([v,...coachCheckins])}/>} 
+      {tab==='account' && <AccountView profile={profile} onSave={persistProfile}/>} 
     </main>
 
     <nav className="bottom-nav">
       <NavButton active={tab==='home'} label="Início" icon="⌂" onClick={()=>setTab('home')}/>
-      <NavButton active={tab==='workout'} label="Treino" icon="●" onClick={()=>setTab('workout')}/>
-      <NavButton active={tab==='trekking'} label="Trekking" icon="▲" onClick={()=>setTab('trekking')}/>
-      <NavButton active={tab==='progress'} label="Progresso" icon="↗" onClick={()=>setTab('progress')}/>
-      <NavButton active={tab==='nutrition'} label="Nutrição" icon="◐" onClick={()=>setTab('nutrition')}/>
+      <NavButton active={tab==='workout'} label="Treino" icon="◆" onClick={()=>setTab('workout')}/>
+      <NavButton active={tab==='health'} label="Saúde" icon="♡" onClick={()=>setTab('health')}/>
+      <NavButton active={tab==='coach'} label="Coach" icon="✦" onClick={()=>setTab('coach')}/>
+      <NavButton active={tab==='account'} label="Conta" icon="⚙" onClick={()=>setTab('account')}/>
     </nav>
   </div>
 }
@@ -109,11 +116,13 @@ function NavButton({active,label,icon,onClick}:{active:boolean,label:string,icon
 function Home({sessions,treks,finishedThisWeek,weeklyVolume,latestWeight,selectedWorkout,setSelectedWorkout,pain,setPain,radiating,setRadiating,startWorkout}:{sessions:WorkoutSession[],treks:TrekkingLog[],finishedThisWeek:number,weeklyVolume:number,latestWeight?:number,selectedWorkout:string,setSelectedWorkout:(v:string)=>void,pain:number,setPain:(v:number)=>void,radiating:boolean,setRadiating:(v:boolean)=>void,startWorkout:()=>void}){
  const w=workouts.find(x=>x.id===selectedWorkout)!
  const totalCardio=treks.slice(0,7).reduce((a,t)=>a+t.durationMin,0)
+ const now=new Date(); const monday=new Date(now); monday.setDate(now.getDate()-((now.getDay()+6)%7));
+ const days=Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d})
  return <div className="page">
-   <section className="hero">
-     <p className="eyebrow">PLANO 5X/SEMANA</p>
-     <h1>Hipertrofia + trekking</h1>
-     <p>Treino com foco em pernas, core, resistência e controle de carga para proteger a região lombar.</p>
+   <section className="home-head">
+     <p className="eyebrow">PLANO ATIVO · 5X/SEMANA</p>
+     <h1>Meu treino</h1>
+     <div className="week-strip">{days.map((d,i)=><div key={i} className={d.toDateString()===now.toDateString()?'day active':'day'}><small>{['S','T','Q','Q','S','S','D'][i]}</small><b>{d.getDate()}</b></div>)}</div>
    </section>
 
    <section className="metric-grid">
