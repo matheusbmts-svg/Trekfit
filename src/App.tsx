@@ -4,18 +4,18 @@ import { storage } from './storage'
 import HealthHub from './HealthHub'
 import CoachView from './CoachView'
 import AccountView from './AccountView'
-import type { CoachCheckin, ExerciseLog, Measurement, Profile, SetLog, Tab, TrekkingLog, WorkoutSession } from './types'
+import { parseWorkoutFile } from './workoutImport'
+import type { CoachCheckin, ExerciseLog, Measurement, Profile, SetLog, Tab, TrekkingLog, WorkoutSession, WorkoutTemplate } from './types'
 
 const todayISO = () => new Date().toISOString().slice(0,10)
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
 const fmtMin = (m:number) => `${Math.floor(m/60)}h ${m%60}min`
 
-function emptyLogs(templateId:string): ExerciseLog[] {
-  const w = workouts.find(x=>x.id===templateId)!
+function emptyLogs(w:WorkoutTemplate): ExerciseLog[] {
   return w.exercises.map(e=>({
     exerciseId:e.id,
     exerciseName:e.name,
-    sets:Array.from({length:e.sets},()=>({load:null,reps:null,rir:null,pain:null,done:false}))
+    sets:Array.from({length:e.sets},()=>({load:null,reps:null,done:false}))
   }))
 }
 
@@ -27,16 +27,15 @@ function latestExerciseHistory(sessions:WorkoutSession[], exerciseId:string) {
     .sort((a,b)=>b.date.localeCompare(a.date))[0]?.log
 }
 
-function nextLoadSuggestion(log:ExerciseLog, repMax:number) {
+function nextLoadSuggestion(log:ExerciseLog, repMin:number, repMax:number) {
   const done = log.sets.filter(s=>s.done && s.load!=null && s.reps!=null)
   if (!done.length) return null
   const avgLoad = done.reduce((a,s)=>a+(s.load||0),0)/done.length
   const allAtMax = done.every(s=>(s.reps||0)>=repMax)
-  const avgRir = done.filter(s=>s.rir!=null).reduce((a,s)=>a+(s.rir||0),0)/Math.max(1,done.filter(s=>s.rir!=null).length)
-  const maxPain = Math.max(...done.map(s=>s.pain||0))
-  if (allAtMax && avgRir>=2 && maxPain<=2) return {load:Math.round(avgLoad*1.025*2)/2, reason:'Todas as séries atingiram o topo da faixa com margem adequada.'}
-  if (maxPain>=4 || avgRir<1) return {load:Math.round(avgLoad*.95*2)/2, reason:'Redução conservadora por dor/esforço alto.'}
-  return {load:Math.round(avgLoad*2)/2, reason:'Mantenha a carga até consolidar a faixa de repetições.'}
+  const belowRange = done.some(s=>(s.reps||0)<repMin)
+  if (allAtMax) return {load:Math.round(avgLoad*1.025*2)/2, reason:'Você completou todas as séries no topo da faixa.'}
+  if (belowRange) return {load:Math.round(avgLoad*.975*2)/2, reason:'Alguma série ficou abaixo da faixa; priorize execução e repetições.'}
+  return {load:Math.round(avgLoad*2)/2, reason:'Mantenha a carga até consolidar o topo da faixa.'}
 }
 
 export default function App(){
@@ -46,6 +45,7 @@ export default function App(){
   const [measurements,setMeasurements]=useState<Measurement[]>(storage.getMeasurements())
   const [coachCheckins,setCoachCheckins]=useState<CoachCheckin[]>(storage.getCoachCheckins())
   const [profile,setProfile]=useState<Profile>(storage.getProfile())
+  const [customWorkouts,setCustomWorkouts]=useState<WorkoutTemplate[]>(storage.getCustomWorkouts())
   const [selectedWorkout,setSelectedWorkout]=useState('A')
   const [active,setActive]=useState<WorkoutSession|null>(null)
   const [pain,setPain]=useState(0)
@@ -56,6 +56,8 @@ export default function App(){
   const persistMeasurements=(v:Measurement[])=>{setMeasurements(v);storage.saveMeasurements(v)}
   const persistCoach=(v:CoachCheckin[])=>{setCoachCheckins(v);storage.saveCoachCheckins(v)}
   const persistProfile=(v:Profile)=>{setProfile(v);storage.saveProfile(v)}
+  const persistCustomWorkouts=(v:WorkoutTemplate[])=>{setCustomWorkouts(v);storage.saveCustomWorkouts(v)}
+  const allWorkouts=useMemo(()=>[...workouts,...customWorkouts],[customWorkouts])
 
   const finishedThisWeek = useMemo(()=>{
     const now=new Date(); const d=(now.getDay()+6)%7; const monday=new Date(now); monday.setDate(now.getDate()-d); monday.setHours(0,0,0,0)
@@ -68,8 +70,9 @@ export default function App(){
   const startWorkout=()=>{
     if(radiating){ alert('Dor irradiada, dormência ou perda de força merece avaliação profissional antes de uma sessão pesada.'); return }
     if(pain>=5){ alert('Com dor lombar 5/10 ou maior, prefira recuperação/avaliação em vez de treino pesado de membros inferiores.'); }
-    const w=workouts.find(x=>x.id===selectedWorkout)!
-    setActive({id:uid(),templateId:w.id,title:`${w.title} — ${w.focus}`,date:todayISO(),startedAt:new Date().toISOString(),lumbarPainBefore:pain,radiatingPain:radiating,exerciseLogs:emptyLogs(w.id)})
+    const w=allWorkouts.find(x=>x.id===selectedWorkout)
+    if(!w) return alert('Treino não encontrado.')
+    setActive({id:uid(),templateId:w.id,title:`${w.title} — ${w.focus}`,date:todayISO(),startedAt:new Date().toISOString(),lumbarPainBefore:pain,radiatingPain:radiating,exerciseLogs:emptyLogs(w)})
     setTab('workout')
   }
 
@@ -88,12 +91,12 @@ export default function App(){
   return <div className="app-shell">
     <header className="topbar">
       <div><span className="brand-mark">▲</span><strong>TrekFit <small>Coach</small></strong></div>
-      <span className="status-pill">v1.1</span>
+      <span className="status-pill">v1.2</span>
     </header>
 
     <main>
-      {tab==='home' && <Home sessions={sessions} treks={treks} finishedThisWeek={finishedThisWeek} weeklyVolume={weeklyVolume} latestWeight={latestWeight} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} pain={pain} setPain={setPain} radiating={radiating} setRadiating={setRadiating} startWorkout={startWorkout}/>} 
-      {tab==='workout' && <WorkoutView active={active} sessions={sessions} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} startWorkout={startWorkout} updateSet={updateSet} finishWorkout={finishWorkout}/>} 
+      {tab==='home' && <Home templates={allWorkouts} sessions={sessions} treks={treks} finishedThisWeek={finishedThisWeek} weeklyVolume={weeklyVolume} latestWeight={latestWeight} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} pain={pain} setPain={setPain} radiating={radiating} setRadiating={setRadiating} startWorkout={startWorkout}/>} 
+      {tab==='workout' && <WorkoutView templates={allWorkouts} customWorkouts={customWorkouts} onImport={(v)=>persistCustomWorkouts([...customWorkouts,...v])} onDeleteCustom={(id)=>{const next=customWorkouts.filter(w=>w.id!==id);persistCustomWorkouts(next);if(selectedWorkout===id)setSelectedWorkout('A')}} active={active} sessions={sessions} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} startWorkout={startWorkout} updateSet={updateSet} finishWorkout={finishWorkout}/>} 
       {tab==='health' && <HealthHub measurements={measurements} sessions={sessions} treks={treks} onSaveMeasurement={(m)=>persistMeasurements([m,...measurements])} onSaveTrek={(t)=>persistTreks([t,...treks])}/>} 
       {tab==='coach' && <CoachView checkins={coachCheckins} onSave={(v)=>persistCoach([v,...coachCheckins])}/>} 
       {tab==='account' && <AccountView profile={profile} onSave={persistProfile}/>} 
@@ -113,11 +116,12 @@ function NavButton({active,label,icon,onClick}:{active:boolean,label:string,icon
  return <button className={active?'nav-btn active':'nav-btn'} onClick={onClick}><span>{icon}</span><small>{label}</small></button>
 }
 
-function Home({sessions,treks,finishedThisWeek,weeklyVolume,latestWeight,selectedWorkout,setSelectedWorkout,pain,setPain,radiating,setRadiating,startWorkout}:{sessions:WorkoutSession[],treks:TrekkingLog[],finishedThisWeek:number,weeklyVolume:number,latestWeight?:number,selectedWorkout:string,setSelectedWorkout:(v:string)=>void,pain:number,setPain:(v:number)=>void,radiating:boolean,setRadiating:(v:boolean)=>void,startWorkout:()=>void}){
- const w=workouts.find(x=>x.id===selectedWorkout)!
+function Home({templates,sessions,treks,finishedThisWeek,weeklyVolume,latestWeight,selectedWorkout,setSelectedWorkout,pain,setPain,radiating,setRadiating,startWorkout}:{templates:WorkoutTemplate[],sessions:WorkoutSession[],treks:TrekkingLog[],finishedThisWeek:number,weeklyVolume:number,latestWeight?:number,selectedWorkout:string,setSelectedWorkout:(v:string)=>void,pain:number,setPain:(v:number)=>void,radiating:boolean,setRadiating:(v:boolean)=>void,startWorkout:()=>void}){
+ const w=templates.find(x=>x.id===selectedWorkout) || templates[0]
  const totalCardio=treks.slice(0,7).reduce((a,t)=>a+t.durationMin,0)
  const now=new Date(); const monday=new Date(now); monday.setDate(now.getDate()-((now.getDay()+6)%7));
  const days=Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d})
+ if(!w) return <div className="page"><section className="card"><h2>Nenhum treino disponível</h2></section></div>
  return <div className="page">
    <section className="home-head">
      <p className="eyebrow">PLANO ATIVO · 5X/SEMANA</p>
@@ -133,17 +137,17 @@ function Home({sessions,treks,finishedThisWeek,weeklyVolume,latestWeight,selecte
    </section>
 
    <section className="card">
-    <div className="section-head"><div><p className="eyebrow">TREINO DE HOJE</p><h2>{w.title}</h2></div><span className="tag">~75–90 min</span></div>
+    <div className="section-head"><div><p className="eyebrow">TREINO DE HOJE</p><h2>{w.title}</h2></div><span className="tag">{w.source==='imported'?'SALVO':'PLANO'}</span></div>
     <h3>{w.focus}</h3>
     <select value={selectedWorkout} onChange={e=>setSelectedWorkout(e.target.value)} className="select">
-      {workouts.map(x=><option key={x.id} value={x.id}>{x.title} — {x.focus}</option>)}
+      {templates.map(x=><option key={x.id} value={x.id}>{x.title} — {x.focus}</option>)}
     </select>
     <div className="safety-box">
       <strong>Check-in lombar</strong>
       <label>Dor agora: <b>{pain}/10</b></label>
       <input type="range" min="0" max="10" value={pain} onChange={e=>setPain(+e.target.value)}/>
       <label className="check"><input type="checkbox" checked={radiating} onChange={e=>setRadiating(e.target.checked)}/> Dor irradiando para glúteo/perna</label>
-      <small>{pain<=2?'Treino normal, se técnica estiver estável.':pain<=4?'Reduza carga em 10–20% e priorize exercícios estáveis.':'Evite sessão pesada e considere avaliação profissional.'}</small>
+      <small>{pain<=2?'Treino normal, se técnica estiver estável.':pain<=4?'Reduza carga e priorize exercícios estáveis.':'Evite sessão pesada e considere avaliação profissional.'}</small>
     </div>
     <button className="primary" onClick={startWorkout}>Iniciar treino</button>
    </section>
@@ -154,35 +158,72 @@ function Home({sessions,treks,finishedThisWeek,weeklyVolume,latestWeight,selecte
 
 function Metric({label,value,sub}:{label:string,value:string,sub:string}){return <div className="metric"><small>{label}</small><b>{value}</b><span>{sub}</span></div>}
 
-function WorkoutView({active,sessions,selectedWorkout,setSelectedWorkout,startWorkout,updateSet,finishWorkout}:{active:WorkoutSession|null,sessions:WorkoutSession[],selectedWorkout:string,setSelectedWorkout:(v:string)=>void,startWorkout:()=>void,updateSet:(e:string,i:number,p:Partial<SetLog>)=>void,finishWorkout:()=>void}){
- if(!active){const w=workouts.find(x=>x.id===selectedWorkout)!;return <div className="page"><section className="card"><p className="eyebrow">FICHA DE TREINO</p><h1>{w.title}</h1><p>{w.focus}</p><select value={selectedWorkout} onChange={e=>setSelectedWorkout(e.target.value)} className="select">{workouts.map(x=><option key={x.id} value={x.id}>{x.title} — {x.focus}</option>)}</select><div className="exercise-preview">{w.exercises.map(e=><div key={e.id}><span>{e.name}</span><b>{e.sets}×{e.repMin}–{e.repMax}</b></div>)}</div><button className="primary" onClick={startWorkout}>Começar este treino</button></section></div>}
- const template=workouts.find(x=>x.id===active.templateId)!
+function WorkoutView({templates,customWorkouts,onImport,onDeleteCustom,active,sessions,selectedWorkout,setSelectedWorkout,startWorkout,updateSet,finishWorkout}:{templates:WorkoutTemplate[],customWorkouts:WorkoutTemplate[],onImport:(v:WorkoutTemplate[])=>void,onDeleteCustom:(id:string)=>void,active:WorkoutSession|null,sessions:WorkoutSession[],selectedWorkout:string,setSelectedWorkout:(v:string)=>void,startWorkout:()=>void,updateSet:(e:string,i:number,p:Partial<SetLog>)=>void,finishWorkout:()=>void}){
+ const [importing,setImporting]=useState(false)
+ const handleFile=async(file?:File)=>{
+   if(!file)return
+   setImporting(true)
+   try{
+     const imported=await parseWorkoutFile(file)
+     onImport(imported)
+     setSelectedWorkout(imported[0].id)
+     alert(`${imported.length} treino(s) importado(s) e salvo(s) neste aparelho.`)
+   }catch(err){
+     alert(err instanceof Error?err.message:'Não foi possível importar este arquivo.')
+   }finally{setImporting(false)}
+ }
+ if(!active){
+   const w=templates.find(x=>x.id===selectedWorkout) || templates[0]
+   return <div className="page">
+    <div className="screen-title"><div><p className="eyebrow">TREINOS</p><h1>Meus treinos</h1></div><span className="tag">{templates.length} salvos</span></div>
+    <section className="card">
+      <p className="eyebrow">{w?.source==='imported'?'TREINO IMPORTADO':'FICHA ATUAL'}</p>
+      <h1>{w?.title||'Nenhum treino'}</h1><p>{w?.focus}</p>
+      <select value={selectedWorkout} onChange={e=>setSelectedWorkout(e.target.value)} className="select">{templates.map(x=><option key={x.id} value={x.id}>{x.title} — {x.focus}</option>)}</select>
+      {w&&<div className="exercise-preview">{w.exercises.map(e=><div key={e.id}><span>{e.name}</span><b>{e.sets}×{e.repMin}{e.repMin!==e.repMax?`–${e.repMax}`:''}</b></div>)}</div>}
+      <button className="primary" disabled={!w} onClick={startWorkout}>Começar este treino</button>
+    </section>
+
+    <section className="card import-card">
+      <div><p className="eyebrow">IMPORTAR TREINO</p><h2>Traga uma ficha que você já possui</h2><p>Envie CSV ou JSON. O TrekFit salva o treino no aparelho e ele passa a aparecer na sua lista.</p></div>
+      <label className={importing?'upload-btn disabled':'upload-btn'}>
+        <input type="file" accept=".csv,.json,text/csv,application/json" disabled={importing} onChange={e=>{handleFile(e.target.files?.[0]);e.currentTarget.value=''}}/>
+        <span>{importing?'Importando...':'↑ Escolher arquivo'}</span>
+      </label>
+      <div className="import-help"><b>CSV simples:</b> treino, exercicio, series, repeticoes. Também aceitamos foco, musculo, descanso e observacoes.</div>
+    </section>
+
+    {customWorkouts.length>0&&<section className="card"><div className="section-head"><div><p className="eyebrow">IMPORTADOS</p><h2>Treinos salvos</h2></div><span className="tag">{customWorkouts.length}</span></div>
+      <div className="saved-workouts">{customWorkouts.map(w=><div className="saved-workout" key={w.id}><button className="saved-main" onClick={()=>setSelectedWorkout(w.id)}><span><b>{w.title}</b><small>{w.exercises.length} exercícios · {w.focus}</small></span><i>›</i></button><button className="delete-workout" onClick={()=>confirm(`Excluir "${w.title}"?`)&&onDeleteCustom(w.id)} aria-label={`Excluir ${w.title}`}>×</button></div>)}</div>
+    </section>}
+   </div>
+ }
+ const template=templates.find(x=>x.id===active.templateId)
+ if(!template) return <div className="page"><section className="card"><h2>Treino não encontrado</h2><p>A ficha usada nesta sessão não está mais disponível.</p></section></div>
  return <div className="page workout-page">
    <section className="card session-head"><p className="eyebrow">EM ANDAMENTO</p><h1>{template.title}</h1><p>{template.focus}</p><div className="pain-badge">Lombar pré-treino: {active.lumbarPainBefore}/10</div></section>
    {template.exercises.map(ex=>{
      const log=active.exerciseLogs.find(l=>l.exerciseId===ex.id)!
      const prev=latestExerciseHistory(sessions,ex.id)
-     const suggestion=prev?nextLoadSuggestion(prev,ex.repMax):null
+     const suggestion=prev?nextLoadSuggestion(prev,ex.repMin,ex.repMax):null
      return <section className="card exercise-card" key={ex.id}>
        <div className="section-head"><div><p className="eyebrow">{ex.muscle}</p><h2>{ex.name}</h2></div><span className={`risk ${ex.spineStress.toLowerCase()}`}>{ex.spineStress}</span></div>
-       <p className="prescription">{ex.sets} séries · {ex.repMin}–{ex.repMax} reps · descanso {ex.rest}s</p>
+       <p className="prescription">{ex.sets} séries · {ex.repMin}{ex.repMin!==ex.repMax?`–${ex.repMax}`:''} reps · descanso {ex.rest}s</p>
        {ex.notes&&<div className="note">{ex.notes}</div>}
        {prev&&<div className="history-line">Último: {prev.sets.filter(s=>s.done).map(s=>`${s.load??'-'}kg×${s.reps??'-'}`).join(' · ')}</div>}
        {suggestion&&<div className="suggestion">Sugestão atual: <b>{suggestion.load} kg</b> — {suggestion.reason}</div>}
        <div className="set-table">
-         <div className="set-row header"><span>Série</span><span>kg</span><span>reps</span><span>RIR</span><span>dor</span><span>✓</span></div>
-         {log.sets.map((s,i)=><div className={s.done?'set-row done':'set-row'} key={i}>
+         <div className="set-row simple header"><span>Série</span><span>kg</span><span>reps</span><span>Feita</span></div>
+         {log.sets.map((s,i)=><div className={s.done?'set-row simple done':'set-row simple'} key={i}>
            <b>{i+1}</b>
            <input inputMode="decimal" value={s.load??''} onChange={e=>updateSet(ex.id,i,{load:e.target.value===''?null:+e.target.value})}/>
            <input inputMode="numeric" value={s.reps??''} onChange={e=>updateSet(ex.id,i,{reps:e.target.value===''?null:+e.target.value})}/>
-           <select value={s.rir??''} onChange={e=>updateSet(ex.id,i,{rir:e.target.value===''?null:+e.target.value})}><option value="">—</option>{[0,1,2,3,4].map(x=><option key={x}>{x}</option>)}</select>
-           <select value={s.pain??''} onChange={e=>updateSet(ex.id,i,{pain:e.target.value===''?null:+e.target.value})}><option value="">—</option>{[0,1,2,3,4,5,6,7,8,9,10].map(x=><option key={x}>{x}</option>)}</select>
            <button className={s.done?'done-btn checked':'done-btn'} onClick={()=>updateSet(ex.id,i,{done:!s.done})}>{s.done?'✓':'○'}</button>
          </div>)}
        </div>
      </section>
    })}
-   <section className="card"><p className="eyebrow">CARDIO</p><h3>{template.cardio}</h3><p>Interrompa ou reduza intensidade caso surjam sintomas neurológicos ou piora relevante da dor.</p></section>
+   {template.cardio&&<section className="card"><p className="eyebrow">CARDIO</p><h3>{template.cardio}</h3><p>Interrompa ou reduza intensidade caso surjam sintomas neurológicos ou piora relevante da dor.</p></section>}
    <button className="primary finish" onClick={finishWorkout}>Finalizar treino</button>
  </div>
 }

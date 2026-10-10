@@ -20,15 +20,18 @@ export type WorkoutTemplate = {
   title: string
   focus: string
   cardio?: string
+  source?: 'builtin' | 'imported'
+  importedAt?: string
   exercises: Exercise[]
 }
 
 export type SetLog = {
   load: number | null
   reps: number | null
-  rir: number | null
-  pain: number | null
   done: boolean
+  // Mantidos opcionais para compatibilidade com históricos da v1.0/v1.1.
+  rir?: number | null
+  pain?: number | null
 }
 
 export type ExerciseLog = {
