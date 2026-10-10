@@ -1,11 +1,12 @@
-import type { CoachCheckin, Measurement, Profile, TrekkingLog, WorkoutSession } from './types'
+import type { CoachCheckin, Measurement, Profile, TrekkingLog, WorkoutSession, WorkoutTemplate } from './types'
 
 const KEYS = {
   sessions: 'trekfit.sessions',
   trekking: 'trekfit.trekking',
   measurements: 'trekfit.measurements',
   profile: 'trekfit.profile',
-  coachCheckins: 'trekfit.coachCheckins'
+  coachCheckins: 'trekfit.coachCheckins',
+  customWorkouts: 'trekfit.customWorkouts'
 }
 
 const read = <T,>(key: string, fallback: T): T => {
@@ -24,6 +25,8 @@ export const storage = {
   saveMeasurements: (v: Measurement[]) => write(KEYS.measurements, v),
   getCoachCheckins: () => read<CoachCheckin[]>(KEYS.coachCheckins, []),
   saveCoachCheckins: (v: CoachCheckin[]) => write(KEYS.coachCheckins, v),
+  getCustomWorkouts: () => read<WorkoutTemplate[]>(KEYS.customWorkouts, []),
+  saveCustomWorkouts: (v: WorkoutTemplate[]) => write(KEYS.customWorkouts, v),
   getProfile: () => read<Profile>(KEYS.profile, defaultProfile),
   saveProfile: (v: Profile) => write(KEYS.profile, v),
 }
