@@ -116,11 +116,13 @@ function NavButton({active,label,icon,onClick}:{active:boolean,label:string,icon
 function Home({sessions,treks,finishedThisWeek,weeklyVolume,latestWeight,selectedWorkout,setSelectedWorkout,pain,setPain,radiating,setRadiating,startWorkout}:{sessions:WorkoutSession[],treks:TrekkingLog[],finishedThisWeek:number,weeklyVolume:number,latestWeight?:number,selectedWorkout:string,setSelectedWorkout:(v:string)=>void,pain:number,setPain:(v:number)=>void,radiating:boolean,setRadiating:(v:boolean)=>void,startWorkout:()=>void}){
  const w=workouts.find(x=>x.id===selectedWorkout)!
  const totalCardio=treks.slice(0,7).reduce((a,t)=>a+t.durationMin,0)
+ const now=new Date(); const monday=new Date(now); monday.setDate(now.getDate()-((now.getDay()+6)%7));
+ const days=Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d})
  return <div className="page">
-   <section className="hero">
-     <p className="eyebrow">PLANO 5X/SEMANA</p>
-     <h1>Hipertrofia + trekking</h1>
-     <p>Treino com foco em pernas, core, resistência e controle de carga para proteger a região lombar.</p>
+   <section className="home-head">
+     <p className="eyebrow">PLANO ATIVO · 5X/SEMANA</p>
+     <h1>Meu treino</h1>
+     <div className="week-strip">{days.map((d,i)=><div key={i} className={d.toDateString()===now.toDateString()?'day active':'day'}><small>{['S','T','Q','Q','S','S','D'][i]}</small><b>{d.getDate()}</b></div>)}</div>
    </section>
 
    <section className="metric-grid">
