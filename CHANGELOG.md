@@ -1,5 +1,14 @@
 # Changelog — TrekFit Coach
 
+## 1.2.0 — Treino rápido + importação
+- Registro por série simplificado para carga, repetições e check de conclusão.
+- RIR e dor deixam de ser exigidos em cada série; dados antigos continuam compatíveis.
+- Progressão de carga simplificada pela faixa de repetições concluída.
+- Importação de fichas de treino em CSV e JSON.
+- Treinos importados ficam salvos localmente e aparecem junto aos treinos padrão.
+- Lista de treinos importados com seleção e exclusão.
+- Cache PWA atualizado para a nova release.
+
 ## 1.1.0 — Coach UI foundation
 - Navegação principal reorganizada para Início, Treino, Saúde, Coach e Conta.
 - Nova área Saúde com Resumo, Body, Nutri e Trekking.
