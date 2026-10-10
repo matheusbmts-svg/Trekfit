@@ -4,18 +4,18 @@ import { storage } from './storage'
 import HealthHub from './HealthHub'
 import CoachView from './CoachView'
 import AccountView from './AccountView'
-import type { CoachCheckin, ExerciseLog, Measurement, Profile, SetLog, Tab, TrekkingLog, WorkoutSession } from './types'
+import { parseWorkoutFile } from './workoutImport'
+import type { CoachCheckin, ExerciseLog, Measurement, Profile, SetLog, Tab, TrekkingLog, WorkoutSession, WorkoutTemplate } from './types'
 
 const todayISO = () => new Date().toISOString().slice(0,10)
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
 const fmtMin = (m:number) => `${Math.floor(m/60)}h ${m%60}min`
 
-function emptyLogs(templateId:string): ExerciseLog[] {
-  const w = workouts.find(x=>x.id===templateId)!
+function emptyLogs(w:WorkoutTemplate): ExerciseLog[] {
   return w.exercises.map(e=>({
     exerciseId:e.id,
     exerciseName:e.name,
-    sets:Array.from({length:e.sets},()=>({load:null,reps:null,rir:null,pain:null,done:false}))
+    sets:Array.from({length:e.sets},()=>({load:null,reps:null,done:false}))
   }))
 }
 
@@ -27,16 +27,15 @@ function latestExerciseHistory(sessions:WorkoutSession[], exerciseId:string) {
     .sort((a,b)=>b.date.localeCompare(a.date))[0]?.log
 }
 
-function nextLoadSuggestion(log:ExerciseLog, repMax:number) {
+function nextLoadSuggestion(log:ExerciseLog, repMin:number, repMax:number) {
   const done = log.sets.filter(s=>s.done && s.load!=null && s.reps!=null)
   if (!done.length) return null
   const avgLoad = done.reduce((a,s)=>a+(s.load||0),0)/done.length
   const allAtMax = done.every(s=>(s.reps||0)>=repMax)
-  const avgRir = done.filter(s=>s.rir!=null).reduce((a,s)=>a+(s.rir||0),0)/Math.max(1,done.filter(s=>s.rir!=null).length)
-  const maxPain = Math.max(...done.map(s=>s.pain||0))
-  if (allAtMax && avgRir>=2 && maxPain<=2) return {load:Math.round(avgLoad*1.025*2)/2, reason:'Todas as séries atingiram o topo da faixa com margem adequada.'}
-  if (maxPain>=4 || avgRir<1) return {load:Math.round(avgLoad*.95*2)/2, reason:'Redução conservadora por dor/esforço alto.'}
-  return {load:Math.round(avgLoad*2)/2, reason:'Mantenha a carga até consolidar a faixa de repetições.'}
+  const belowRange = done.some(s=>(s.reps||0)<repMin)
+  if (allAtMax) return {load:Math.round(avgLoad*1.025*2)/2, reason:'Você completou todas as séries no topo da faixa.'}
+  if (belowRange) return {load:Math.round(avgLoad*.975*2)/2, reason:'Alguma série ficou abaixo da faixa; priorize execução e repetições.'}
+  return {load:Math.round(avgLoad*2)/2, reason:'Mantenha a carga até consolidar o topo da faixa.'}
 }
 
 export default function App(){
@@ -46,6 +45,7 @@ export default function App(){
   const [measurements,setMeasurements]=useState<Measurement[]>(storage.getMeasurements())
   const [coachCheckins,setCoachCheckins]=useState<CoachCheckin[]>(storage.getCoachCheckins())
   const [profile,setProfile]=useState<Profile>(storage.getProfile())
+  const [customWorkouts,setCustomWorkouts]=useState<WorkoutTemplate[]>(storage.getCustomWorkouts())
   const [selectedWorkout,setSelectedWorkout]=useState('A')
   const [active,setActive]=useState<WorkoutSession|null>(null)
   const [pain,setPain]=useState(0)
@@ -56,6 +56,8 @@ export default function App(){
   const persistMeasurements=(v:Measurement[])=>{setMeasurements(v);storage.saveMeasurements(v)}
   const persistCoach=(v:CoachCheckin[])=>{setCoachCheckins(v);storage.saveCoachCheckins(v)}
   const persistProfile=(v:Profile)=>{setProfile(v);storage.saveProfile(v)}
+  const persistCustomWorkouts=(v:WorkoutTemplate[])=>{setCustomWorkouts(v);storage.saveCustomWorkouts(v)}
+  const allWorkouts=useMemo(()=>[...workouts,...customWorkouts],[customWorkouts])
 
   const finishedThisWeek = useMemo(()=>{
     const now=new Date(); const d=(now.getDay()+6)%7; const monday=new Date(now); monday.setDate(now.getDate()-d); monday.setHours(0,0,0,0)
@@ -68,8 +70,9 @@ export default function App(){
   const startWorkout=()=>{
     if(radiating){ alert('Dor irradiada, dormência ou perda de força merece avaliação profissional antes de uma sessão pesada.'); return }
     if(pain>=5){ alert('Com dor lombar 5/10 ou maior, prefira recuperação/avaliação em vez de treino pesado de membros inferiores.'); }
-    const w=workouts.find(x=>x.id===selectedWorkout)!
-    setActive({id:uid(),templateId:w.id,title:`${w.title} — ${w.focus}`,date:todayISO(),startedAt:new Date().toISOString(),lumbarPainBefore:pain,radiatingPain:radiating,exerciseLogs:emptyLogs(w.id)})
+    const w=allWorkouts.find(x=>x.id===selectedWorkout)
+    if(!w) return alert('Treino não encontrado.')
+    setActive({id:uid(),templateId:w.id,title:`${w.title} — ${w.focus}`,date:todayISO(),startedAt:new Date().toISOString(),lumbarPainBefore:pain,radiatingPain:radiating,exerciseLogs:emptyLogs(w)})
     setTab('workout')
   }
 
@@ -88,12 +91,12 @@ export default function App(){
   return <div className="app-shell">
     <header className="topbar">
       <div><span className="brand-mark">▲</span><strong>TrekFit <small>Coach</small></strong></div>
-      <span className="status-pill">v1.1</span>
+      <span className="status-pill">v1.2</span>
     </header>
 
     <main>
-      {tab==='home' && <Home sessions={sessions} treks={treks} finishedThisWeek={finishedThisWeek} weeklyVolume={weeklyVolume} latestWeight={latestWeight} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} pain={pain} setPain={setPain} radiating={radiating} setRadiating={setRadiating} startWorkout={startWorkout}/>} 
-      {tab==='workout' && <WorkoutView active={active} sessions={sessions} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} startWorkout={startWorkout} updateSet={updateSet} finishWorkout={finishWorkout}/>} 
+      {tab==='home' && <Home templates={allWorkouts} sessions={sessions} treks={treks} finishedThisWeek={finishedThisWeek} weeklyVolume={weeklyVolume} latestWeight={latestWeight} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} pain={pain} setPain={setPain} radiating={radiating} setRadiating={setRadiating} startWorkout={startWorkout}/>} 
+      {tab==='workout' && <WorkoutView templates={allWorkouts} customWorkouts={customWorkouts} onImport={(v)=>persistCustomWorkouts([...customWorkouts,...v])} onDeleteCustom={(id)=>{const next=customWorkouts.filter(w=>w.id!==id);persistCustomWorkouts(next);if(selectedWorkout===id)setSelectedWorkout('A')}} active={active} sessions={sessions} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} startWorkout={startWorkout} updateSet={updateSet} finishWorkout={finishWorkout}/>} 
       {tab==='health' && <HealthHub measurements={measurements} sessions={sessions} treks={treks} onSaveMeasurement={(m)=>persistMeasurements([m,...measurements])} onSaveTrek={(t)=>persistTreks([t,...treks])}/>} 
       {tab==='coach' && <CoachView checkins={coachCheckins} onSave={(v)=>persistCoach([v,...coachCheckins])}/>} 
       {tab==='account' && <AccountView profile={profile} onSave={persistProfile}/>} 
