@@ -5,7 +5,7 @@ import HealthHub from './HealthHub'
 import CoachView from './CoachView'
 import AccountView from './AccountView'
 import { parseWorkoutFile } from './workoutImport'
-import type { CoachCheckin, ExerciseLog, Measurement, NutritionPlan, Profile, SetLog, Tab, TrekkingLog, WorkoutSession, WorkoutTemplate } from './types'
+import type { CoachCheckin, ExerciseLog, Measurement, NutritionPlan, NutritionTarget, Profile, SetLog, Tab, TrekkingLog, WorkoutSession, WorkoutTemplate } from './types'
 
 const todayISO = () => new Date().toISOString().slice(0,10)
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
@@ -28,6 +28,7 @@ export default function App(){
   const [profile,setProfile]=useState<Profile>(storage.getProfile())
   const [customWorkouts,setCustomWorkouts]=useState<WorkoutTemplate[]>(storage.getCustomWorkouts())
   const [nutritionPlan,setNutritionPlan]=useState<NutritionPlan|null>(storage.getNutritionPlan())
+  const [nutritionGoal,setNutritionGoal]=useState<NutritionTarget>(storage.getNutritionTarget())
   const [selectedWorkout,setSelectedWorkout]=useState('A')
   const [active,setActive]=useState<WorkoutSession|null>(null)
   const [pain,setPain]=useState(0)
@@ -40,6 +41,7 @@ export default function App(){
   const persistProfile=(v:Profile)=>{setProfile(v);storage.saveProfile(v)}
   const persistCustomWorkouts=(v:WorkoutTemplate[])=>{setCustomWorkouts(v);storage.saveCustomWorkouts(v)}
   const persistNutritionPlan=(v:NutritionPlan|null)=>{setNutritionPlan(v);storage.saveNutritionPlan(v)}
+  const persistNutritionGoal=(v:NutritionTarget)=>{setNutritionGoal(v);storage.saveNutritionTarget(v)}
   const allWorkouts=useMemo(()=>[...workouts,...customWorkouts],[customWorkouts])
 
   const finishedThisWeek = useMemo(()=>{
@@ -77,13 +79,13 @@ export default function App(){
   return <div className="app-shell">
     <header className="topbar">
       <div><span className="brand-mark">▲</span><strong>TrekFit <small>Coach</small></strong></div>
-      <span className="status-pill">v1.3</span>
+      <span className="status-pill">v1.4</span>
     </header>
 
     <main>
       {tab==='home' && <Home templates={allWorkouts} sessions={sessions} treks={treks} finishedThisWeek={finishedThisWeek} weeklySets={weeklySets} latestWeight={latestWeight} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} pain={pain} setPain={setPain} radiating={radiating} setRadiating={setRadiating} startWorkout={startWorkout}/>} 
       {tab==='workout' && <WorkoutView templates={allWorkouts} customWorkouts={customWorkouts} onImport={(v)=>persistCustomWorkouts([...customWorkouts,...v])} onDeleteCustom={(id)=>{const next=customWorkouts.filter(w=>w.id!==id);persistCustomWorkouts(next);if(selectedWorkout===id)setSelectedWorkout('A')}} active={active} sessions={sessions} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} startWorkout={startWorkout} updateSet={updateSet} finishWorkout={finishWorkout}/>} 
-      {tab==='health' && <HealthHub measurements={measurements} sessions={sessions} treks={treks} nutritionPlan={nutritionPlan} onSaveNutritionPlan={persistNutritionPlan} onSaveMeasurement={(m)=>persistMeasurements([m,...measurements])} onSaveTrek={(t)=>persistTreks([t,...treks])}/>} 
+      {tab==='health' && <HealthHub measurements={measurements} sessions={sessions} treks={treks} nutritionPlan={nutritionPlan} nutritionGoal={nutritionGoal} onSaveNutritionPlan={persistNutritionPlan} onSaveNutritionGoal={persistNutritionGoal} onSaveMeasurement={(m)=>persistMeasurements([m,...measurements])} onSaveTrek={(t)=>persistTreks([t,...treks])}/>} 
       {tab==='coach' && <CoachView checkins={coachCheckins} onSave={(v)=>persistCoach([v,...coachCheckins])}/>} 
       {tab==='account' && <AccountView profile={profile} onSave={persistProfile}/>} 
     </main>
