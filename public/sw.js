@@ -1,4 +1,4 @@
-const CACHE = 'trekfit-v1.3';
+const CACHE = 'trekfit-v1.4';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {

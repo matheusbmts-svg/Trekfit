@@ -126,3 +126,11 @@ export type NutritionPlan = {
   meals: NutritionMeal[]
   importedAt: string
 }
+
+
+export type NutritionTarget = {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+}

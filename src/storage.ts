@@ -1,4 +1,4 @@
-import type { CoachCheckin, Measurement, NutritionPlan, Profile, TrekkingLog, WorkoutSession, WorkoutTemplate } from './types'
+import type { CoachCheckin, Measurement, NutritionPlan, NutritionTarget, Profile, TrekkingLog, WorkoutSession, WorkoutTemplate } from './types'
 
 const KEYS = {
   sessions: 'trekfit.sessions',
@@ -7,7 +7,8 @@ const KEYS = {
   profile: 'trekfit.profile',
   coachCheckins: 'trekfit.coachCheckins',
   customWorkouts: 'trekfit.customWorkouts',
-  nutritionPlan: 'trekfit.nutritionPlan'
+  nutritionPlan: 'trekfit.nutritionPlan',
+  nutritionTarget: 'trekfit.nutritionTarget'
 }
 
 const read = <T,>(key: string, fallback: T): T => {
@@ -16,6 +17,7 @@ const read = <T,>(key: string, fallback: T): T => {
 const write = <T,>(key: string, value: T) => localStorage.setItem(key, JSON.stringify(value))
 
 const defaultProfile: Profile = { name: 'Atleta', goal: 'Performance + composição corporal', weeklyTarget: 5 }
+const defaultNutritionTarget: NutritionTarget = { calories: 1900, protein: 145, carbs: 195, fat: 60 }
 
 export const storage = {
   getSessions: () => read<WorkoutSession[]>(KEYS.sessions, []),
@@ -30,6 +32,8 @@ export const storage = {
   saveCustomWorkouts: (v: WorkoutTemplate[]) => write(KEYS.customWorkouts, v),
   getNutritionPlan: () => read<NutritionPlan | null>(KEYS.nutritionPlan, null),
   saveNutritionPlan: (v: NutritionPlan | null) => write(KEYS.nutritionPlan, v),
+  getNutritionTarget: () => read<NutritionTarget>(KEYS.nutritionTarget, defaultNutritionTarget),
+  saveNutritionTarget: (v: NutritionTarget) => write(KEYS.nutritionTarget, v),
   getProfile: () => read<Profile>(KEYS.profile, defaultProfile),
   saveProfile: (v: Profile) => write(KEYS.profile, v),
 }
