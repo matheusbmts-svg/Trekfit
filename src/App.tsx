@@ -133,7 +133,7 @@ function Home({templates,sessions,treks,finishedThisWeek,weeklySets,latestWeight
       <label>Dor agora: <b>{pain}/10</b></label>
       <input type="range" min="0" max="10" value={pain} onChange={e=>setPain(+e.target.value)}/>
       <label className="check"><input type="checkbox" checked={radiating} onChange={e=>setRadiating(e.target.checked)}/> Dor irradiando para glúteo/perna</label>
-      <small>{pain<=2?'Treino normal, se técnica estiver estável.':pain<=4?'Reduza carga e priorize exercícios estáveis.':'Evite sessão pesada e considere avaliação profissional.'}</small>
+      <small>{pain<=2?'Treino normal, se técnica estiver estável.':pain<=4?'Reduza a intensidade e priorize exercícios estáveis.':'Evite sessão pesada e considere avaliação profissional.'}</small>
     </div>
     <button className="primary" onClick={startWorkout}>Iniciar treino</button>
    </section>
