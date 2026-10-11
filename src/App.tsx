@@ -15,27 +15,8 @@ function emptyLogs(w:WorkoutTemplate): ExerciseLog[] {
   return w.exercises.map(e=>({
     exerciseId:e.id,
     exerciseName:e.name,
-    sets:Array.from({length:e.sets},()=>({load:null,reps:null,done:false}))
+    sets:Array.from({length:e.sets},()=>({done:false}))
   }))
-}
-
-function latestExerciseHistory(sessions:WorkoutSession[], exerciseId:string) {
-  return sessions
-    .filter(s=>Boolean(s.finishedAt))
-    .flatMap(s=>s.exerciseLogs.map(l=>({date:s.date, log:l})))
-    .filter(x=>x.log.exerciseId===exerciseId)
-    .sort((a,b)=>b.date.localeCompare(a.date))[0]?.log
-}
-
-function nextLoadSuggestion(log:ExerciseLog, repMin:number, repMax:number) {
-  const done = log.sets.filter(s=>s.done && s.load!=null && s.reps!=null)
-  if (!done.length) return null
-  const avgLoad = done.reduce((a,s)=>a+(s.load||0),0)/done.length
-  const allAtMax = done.every(s=>(s.reps||0)>=repMax)
-  const belowRange = done.some(s=>(s.reps||0)<repMin)
-  if (allAtMax) return {load:Math.round(avgLoad*1.025*2)/2, reason:'Você completou todas as séries no topo da faixa.'}
-  if (belowRange) return {load:Math.round(avgLoad*.975*2)/2, reason:'Alguma série ficou abaixo da faixa; priorize execução e repetições.'}
-  return {load:Math.round(avgLoad*2)/2, reason:'Mantenha a carga até consolidar o topo da faixa.'}
 }
 
 export default function App(){
@@ -66,7 +47,10 @@ export default function App(){
     return sessions.filter(s=>s.finishedAt && new Date(s.date)>=monday).length
   },[sessions])
 
-  const weeklyVolume = useMemo(()=>sessions.slice(0,10).reduce((acc,s)=>acc+s.exerciseLogs.reduce((a,l)=>a+l.sets.reduce((z,x)=>z+(x.done?(x.load||0)*(x.reps||0):0),0),0),0),[sessions])
+  const weeklySets = useMemo(()=>{
+    const now=new Date(); const d=(now.getDay()+6)%7; const monday=new Date(now); monday.setDate(now.getDate()-d); monday.setHours(0,0,0,0)
+    return sessions.filter(s=>s.finishedAt && new Date(s.date)>=monday).reduce((acc,s)=>acc+s.exerciseLogs.reduce((a,l)=>a+l.sets.filter(x=>x.done).length,0),0)
+  },[sessions])
   const latestWeight = measurements.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]?.weightKg
 
   const startWorkout=()=>{
@@ -97,7 +81,7 @@ export default function App(){
     </header>
 
     <main>
-      {tab==='home' && <Home templates={allWorkouts} sessions={sessions} treks={treks} finishedThisWeek={finishedThisWeek} weeklyVolume={weeklyVolume} latestWeight={latestWeight} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} pain={pain} setPain={setPain} radiating={radiating} setRadiating={setRadiating} startWorkout={startWorkout}/>} 
+      {tab==='home' && <Home templates={allWorkouts} sessions={sessions} treks={treks} finishedThisWeek={finishedThisWeek} weeklySets={weeklySets} latestWeight={latestWeight} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} pain={pain} setPain={setPain} radiating={radiating} setRadiating={setRadiating} startWorkout={startWorkout}/>} 
       {tab==='workout' && <WorkoutView templates={allWorkouts} customWorkouts={customWorkouts} onImport={(v)=>persistCustomWorkouts([...customWorkouts,...v])} onDeleteCustom={(id)=>{const next=customWorkouts.filter(w=>w.id!==id);persistCustomWorkouts(next);if(selectedWorkout===id)setSelectedWorkout('A')}} active={active} sessions={sessions} selectedWorkout={selectedWorkout} setSelectedWorkout={setSelectedWorkout} startWorkout={startWorkout} updateSet={updateSet} finishWorkout={finishWorkout}/>} 
       {tab==='health' && <HealthHub measurements={measurements} sessions={sessions} treks={treks} nutritionPlan={nutritionPlan} onSaveNutritionPlan={persistNutritionPlan} onSaveMeasurement={(m)=>persistMeasurements([m,...measurements])} onSaveTrek={(t)=>persistTreks([t,...treks])}/>} 
       {tab==='coach' && <CoachView checkins={coachCheckins} onSave={(v)=>persistCoach([v,...coachCheckins])}/>} 
@@ -118,7 +102,7 @@ function NavButton({active,label,icon,onClick}:{active:boolean,label:string,icon
  return <button className={active?'nav-btn active':'nav-btn'} onClick={onClick}><span>{icon}</span><small>{label}</small></button>
 }
 
-function Home({templates,sessions,treks,finishedThisWeek,weeklyVolume,latestWeight,selectedWorkout,setSelectedWorkout,pain,setPain,radiating,setRadiating,startWorkout}:{templates:WorkoutTemplate[],sessions:WorkoutSession[],treks:TrekkingLog[],finishedThisWeek:number,weeklyVolume:number,latestWeight?:number,selectedWorkout:string,setSelectedWorkout:(v:string)=>void,pain:number,setPain:(v:number)=>void,radiating:boolean,setRadiating:(v:boolean)=>void,startWorkout:()=>void}){
+function Home({templates,sessions,treks,finishedThisWeek,weeklySets,latestWeight,selectedWorkout,setSelectedWorkout,pain,setPain,radiating,setRadiating,startWorkout}:{templates:WorkoutTemplate[],sessions:WorkoutSession[],treks:TrekkingLog[],finishedThisWeek:number,weeklySets:number,latestWeight?:number,selectedWorkout:string,setSelectedWorkout:(v:string)=>void,pain:number,setPain:(v:number)=>void,radiating:boolean,setRadiating:(v:boolean)=>void,startWorkout:()=>void}){
  const w=templates.find(x=>x.id===selectedWorkout) || templates[0]
  const totalCardio=treks.slice(0,7).reduce((a,t)=>a+t.durationMin,0)
  const now=new Date(); const monday=new Date(now); monday.setDate(now.getDate()-((now.getDay()+6)%7));
@@ -133,7 +117,7 @@ function Home({templates,sessions,treks,finishedThisWeek,weeklyVolume,latestWeig
 
    <section className="metric-grid">
     <Metric label="Treinos" value={`${finishedThisWeek}/5`} sub="esta semana"/>
-    <Metric label="Volume" value={`${Math.round(weeklyVolume/1000)}k`} sub="kg registrados"/>
+    <Metric label="Séries" value={`${weeklySets}`} sub="concluídas na semana"/>
     <Metric label="Cardio" value={`${totalCardio}`} sub="min recentes"/>
     <Metric label="Peso" value={latestWeight?`${latestWeight} kg`:'—'} sub="último registro"/>
    </section>
@@ -206,22 +190,14 @@ function WorkoutView({templates,customWorkouts,onImport,onDeleteCustom,active,se
    <section className="card session-head"><p className="eyebrow">EM ANDAMENTO</p><h1>{template.title}</h1><p>{template.focus}</p><div className="pain-badge">Lombar pré-treino: {active.lumbarPainBefore}/10</div></section>
    {template.exercises.map(ex=>{
      const log=active.exerciseLogs.find(l=>l.exerciseId===ex.id)!
-     const prev=latestExerciseHistory(sessions,ex.id)
-     const suggestion=prev?nextLoadSuggestion(prev,ex.repMin,ex.repMax):null
      return <section className="card exercise-card" key={ex.id}>
        <div className="section-head"><div><p className="eyebrow">{ex.muscle}</p><h2>{ex.name}</h2></div><span className={`risk ${ex.spineStress.toLowerCase()}`}>{ex.spineStress}</span></div>
        <p className="prescription">{ex.sets} séries · {ex.repMin}{ex.repMin!==ex.repMax?`–${ex.repMax}`:''} reps · descanso {ex.rest}s</p>
        {ex.notes&&<div className="note">{ex.notes}</div>}
-       {prev&&<div className="history-line">Último: {prev.sets.filter(s=>s.done).map(s=>`${s.load??'-'}kg×${s.reps??'-'}`).join(' · ')}</div>}
-       {suggestion&&<div className="suggestion">Sugestão atual: <b>{suggestion.load} kg</b> — {suggestion.reason}</div>}
-       <div className="set-table">
-         <div className="set-row simple header"><span>Série</span><span>kg</span><span>reps</span><span>Feita</span></div>
-         {log.sets.map((s,i)=><div className={s.done?'set-row simple done':'set-row simple'} key={i}>
-           <b>{i+1}</b>
-           <input inputMode="decimal" value={s.load??''} onChange={e=>updateSet(ex.id,i,{load:e.target.value===''?null:+e.target.value})}/>
-           <input inputMode="numeric" value={s.reps??''} onChange={e=>updateSet(ex.id,i,{reps:e.target.value===''?null:+e.target.value})}/>
-           <button className={s.done?'done-btn checked':'done-btn'} onClick={()=>updateSet(ex.id,i,{done:!s.done})}>{s.done?'✓':'○'}</button>
-         </div>)}
+       <div className="set-checklist">
+         {log.sets.map((s,i)=><button className={s.done?'series-check done':'series-check'} key={i} onClick={()=>updateSet(ex.id,i,{done:!s.done})}>
+           <span>Série {i+1}</span><b>{s.done?'✓':'○'}</b>
+         </button>)}
        </div>
      </section>
    })}
