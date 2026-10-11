@@ -88,3 +88,19 @@ body{background:radial-gradient(circle at 80% -10%,rgba(155,225,93,.16),transpar
 .food-macros{text-align:right;align-items:flex-end}.food-macros b{font-size:12px;color:#dce3e5}.food-macros small{white-space:nowrap}
 .text-danger{width:100%;margin-top:12px;border:0;background:transparent;color:#fda4af;padding:8px;font-weight:800}
 @media (max-width:390px){.set-checklist{grid-template-columns:1fr}.food-row{flex-direction:column}.food-macros{text-align:left;align-items:flex-start}}
+
+/* TrekFit Coach v1.4 — metas nutricionais editáveis */
+.nutrition-summary-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;text-align:left}
+.target-sub{display:block;color:#677279;font-size:11px;margin-top:3px}
+.edit-target{border:1px solid rgba(155,225,93,.28);background:rgba(155,225,93,.08);color:var(--accent);border-radius:999px;padding:8px 13px;font-size:12px;font-weight:900}
+.editable-target h1{margin-top:12px}
+.target-foot{margin-top:14px;color:#718087;font-size:10px}
+.target-editor{border-color:rgba(155,225,93,.18);background:radial-gradient(circle at 90% 0,rgba(155,225,93,.08),transparent 35%),var(--panel)}
+.close-editor{border:0;background:#20262a;color:#aab4b9;width:34px;height:34px;border-radius:50%;font-size:21px}
+.target-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin-top:16px}
+.inline-primary{padding:11px 14px}
+.plan-vs-target{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.plan-vs-target h2{margin:3px 0 5px}.plan-vs-target p{font-size:11px;margin:0}
+.plan-diff{flex:0 0 auto;padding:8px 10px;border-radius:999px;background:rgba(251,191,36,.10);color:#fde68a;font-size:10px;font-weight:900}
+.plan-diff.close{background:rgba(155,225,93,.09);color:#b7ef8c}.plan-diff.neutral{background:rgba(45,212,191,.09);color:#83efe0}
+@media (max-width:430px){.plan-vs-target{align-items:flex-start;flex-direction:column}.target-actions{grid-template-columns:1fr}}
