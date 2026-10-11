@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { nutritionTarget } from './data'
-import type { HealthSection, Measurement, TrekkingLog, WorkoutSession } from './types'
+import { parseDietFile } from './dietImport'
+import type { HealthSection, Measurement, NutritionPlan, TrekkingLog, WorkoutSession } from './types'
 
 const todayISO=()=>new Date().toISOString().slice(0,10)
 const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now())
 const fmtMin=(m:number)=>`${Math.floor(m/60)}h ${m%60}min`
 
-export default function HealthHub({measurements,sessions,treks,onSaveMeasurement,onSaveTrek}:{measurements:Measurement[],sessions:WorkoutSession[],treks:TrekkingLog[],onSaveMeasurement:(m:Measurement)=>void,onSaveTrek:(t:TrekkingLog)=>void}){
+export default function HealthHub({measurements,sessions,treks,nutritionPlan,onSaveNutritionPlan,onSaveMeasurement,onSaveTrek}:{measurements:Measurement[],sessions:WorkoutSession[],treks:TrekkingLog[],nutritionPlan:NutritionPlan|null,onSaveNutritionPlan:(p:NutritionPlan|null)=>void,onSaveMeasurement:(m:Measurement)=>void,onSaveTrek:(t:TrekkingLog)=>void}){
  const [section,setSection]=useState<HealthSection>('summary')
  const latest=measurements.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]
  const totalTreks=treks.reduce((a,t)=>a+t.distanceKm,0)
@@ -28,10 +29,10 @@ export default function HealthHub({measurements,sessions,treks,onSaveMeasurement
       <Metric label="Medidas" value={String(measurements.length)} sub="check-ins"/>
     </section>
     <section className="card action-card"><div><p className="eyebrow">EVOLUÇÃO CORPORAL</p><h2>Transforme registros em tendência</h2><p>Use peso, cintura e performance em conjunto. Um único número não define progresso.</p></div><button className="ghost" onClick={()=>setSection('body')}>Ver detalhes</button></section>
-    <section className="card action-card"><div><p className="eyebrow">PLANO NUTRICIONAL</p><h2>{nutritionTarget.calories} kcal/dia</h2><p>{nutritionTarget.protein}g proteína · {nutritionTarget.carbs}g carbo · {nutritionTarget.fat}g gordura</p></div><button className="ghost" onClick={()=>setSection('nutrition')}>Abrir Nutri</button></section>
+    <section className="card action-card"><div><p className="eyebrow">PLANO NUTRICIONAL</p><h2>{nutritionPlan?.calories||nutritionTarget.calories} kcal/dia</h2><p>{nutritionPlan?nutritionPlan.title:`${nutritionTarget.protein}g proteína · ${nutritionTarget.carbs}g carbo · ${nutritionTarget.fat}g gordura`}</p></div><button className="ghost" onClick={()=>setSection('nutrition')}>Abrir Nutri</button></section>
    </>}
    {section==='body'&&<BodyView measurements={measurements} sessions={sessions} onSave={onSaveMeasurement}/>}
-   {section==='nutrition'&&<NutritionView/>}
+   {section==='nutrition'&&<NutritionView plan={nutritionPlan} onSave={onSaveNutritionPlan}/>}
    {section==='trekking'&&<TrekkingView treks={treks} onSave={onSaveTrek}/>}
  </div>
 }
@@ -57,14 +58,54 @@ function BodyView({measurements,sessions,onSave}:{measurements:Measurement[],ses
  </div>
 }
 
-function NutritionView(){
- const mealPlan:[string,number][]=[['Café da manhã',25],['Almoço',30],['Pré-treino',15],['Jantar',25],['Flexível',5]]
+function NutritionView({plan,onSave}:{plan:NutritionPlan|null,onSave:(p:NutritionPlan|null)=>void}){
+ const [importing,setImporting]=useState(false)
+ const [openMeal,setOpenMeal]=useState<string|null>(plan?.meals[0]?.id||null)
+ const handleFile=async(file?:File)=>{
+   if(!file)return
+   setImporting(true)
+   try{
+     const parsed=await parseDietFile(file)
+     onSave(parsed)
+     setOpenMeal(parsed.meals[0]?.id||null)
+     alert('Dieta importada e salva no TrekFit.')
+   }catch(err){
+     alert(err instanceof Error?err.message:'Não foi possível importar esta dieta.')
+   }finally{setImporting(false)}
+ }
+ const calories=plan?.calories||nutritionTarget.calories
+ const protein=plan?.protein||nutritionTarget.protein
+ const carbs=plan?.carbs||nutritionTarget.carbs
+ const fat=plan?.fat||nutritionTarget.fat
  return <div className="embedded-page">
-   <section className="nutrition-summary"><p className="eyebrow">PLANO ATUAL</p><h1>{nutritionTarget.calories} kcal</h1><div className="macro-row"><Macro label="Proteína" value={nutritionTarget.protein}/><Macro label="Carbo" value={nutritionTarget.carbs}/><Macro label="Gordura" value={nutritionTarget.fat}/></div></section>
-   <section className="notice"><span>✦</span><div><b>Dieta guiada pelo acompanhamento</b><p>As metas serão ajustadas pela tendência de peso, cintura, performance e aderência.</p></div></section>
-   <h2 className="section-title">Refeições planejadas</h2>
-   <section className="meal-list">{mealPlan.map(([name,pct])=><div className="meal-card" key={name}><div><small>{pct}% da meta diária</small><h3>{name}</h3><p>≈ {Math.round(nutritionTarget.calories*pct/100)} kcal</p></div><span>›</span></div>)}</section>
-   <section className="info-note">Nesta versão, a Nutri exibe a meta e a distribuição do plano. Registro de alimentos, favoritos, receitas e aderência diária entram nas próximas versões.</section>
+   <section className="nutrition-summary"><p className="eyebrow">{plan?'PLANO IMPORTADO':'META ATUAL'}</p><h1>{calories} kcal</h1>{plan&&<h3 className="diet-title">{plan.title}</h3>}<div className="macro-row"><Macro label="Proteína" value={protein}/><Macro label="Carbo" value={carbs}/><Macro label="Gordura" value={fat}/></div></section>
+   <section className="notice"><span>✦</span><div><b>Dieta guiada pelo acompanhamento</b><p>O plano pode ser atualizado conforme peso, medidas, performance, fome e aderência.</p></div></section>
+
+   <section className="card import-card">
+     <div><p className="eyebrow">IMPORTAR DIETA</p><h2>{plan?'Atualizar plano alimentar':'Adicionar plano alimentar'}</h2><p>Envie CSV ou JSON. As refeições e alimentos ficam salvos neste aparelho e aparecem diretamente na aba Nutri.</p></div>
+     <label className={importing?'upload-btn disabled':'upload-btn'}>
+       <input type="file" accept=".csv,.json,text/csv,application/json" disabled={importing} onChange={e=>{handleFile(e.target.files?.[0]);e.currentTarget.value=''}}/>
+       <span>{importing?'Importando...':'↑ Escolher arquivo da dieta'}</span>
+     </label>
+     <div className="import-help"><b>CSV simples:</b> refeicao, horario, alimento, quantidade, unidade, calorias, proteina, carboidrato, gordura.</div>
+     {plan&&<button className="text-danger" onClick={()=>confirm('Remover a dieta salva?')&&onSave(null)}>Remover dieta atual</button>}
+   </section>
+
+   {plan ? <>
+     <div className="meal-heading"><h2 className="section-title">Refeições</h2><span>{plan.meals.length} no plano</span></div>
+     <section className="meal-list detailed">{plan.meals.map(meal=>{
+       const open=openMeal===meal.id
+       return <div className={open?'meal-card detailed open':'meal-card detailed'} key={meal.id}>
+         <button className="meal-summary" onClick={()=>setOpenMeal(open?null:meal.id)}>
+           <div><small>{meal.time||'Horário livre'}</small><h3>{meal.name}</h3><p>{Math.round(meal.calories)} kcal · P {Math.round(meal.protein)}g · C {Math.round(meal.carbs)}g · G {Math.round(meal.fat)}g</p></div><span>{open?'⌃':'⌄'}</span>
+         </button>
+         {open&&<div className="food-list">{meal.foods.map(food=><div className="food-row" key={food.id}>
+           <div><b>{food.name}</b><small>{food.amount?food.amount:''} {food.unit||''}{food.notes?` · ${food.notes}`:''}</small></div>
+           <div className="food-macros"><b>{food.calories!=null?`${Math.round(food.calories)} kcal`:'—'}</b><small>{food.protein!=null?`P ${food.protein}g`:''}{food.carbs!=null?` · C ${food.carbs}g`:''}{food.fat!=null?` · G ${food.fat}g`:''}</small></div>
+         </div>)}</div>}
+       </div>
+     })}</section>
+   </> : <section className="info-note">Ainda não há uma dieta importada. A meta acima continua como referência até você enviar um plano alimentar.</section>}
  </div>
 }
 
