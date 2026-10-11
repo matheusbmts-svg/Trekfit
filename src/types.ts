@@ -26,10 +26,10 @@ export type WorkoutTemplate = {
 }
 
 export type SetLog = {
-  load: number | null
-  reps: number | null
   done: boolean
-  // Mantidos opcionais para compatibilidade com históricos da v1.0/v1.1.
+  // Campos legados opcionais: preservam históricos das versões anteriores.
+  load?: number | null
+  reps?: number | null
   rir?: number | null
   pain?: number | null
 }
@@ -90,4 +90,39 @@ export type Profile = {
   name: string
   goal: string
   weeklyTarget: number
+}
+
+
+export type NutritionFood = {
+  id: string
+  name: string
+  amount?: number
+  unit?: string
+  calories?: number
+  protein?: number
+  carbs?: number
+  fat?: number
+  notes?: string
+}
+
+export type NutritionMeal = {
+  id: string
+  name: string
+  time?: string
+  foods: NutritionFood[]
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+}
+
+export type NutritionPlan = {
+  id: string
+  title: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  meals: NutritionMeal[]
+  importedAt: string
 }

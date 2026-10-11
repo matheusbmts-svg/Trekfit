@@ -1,5 +1,15 @@
 # Changelog — TrekFit Coach
 
+## 1.3.0 — Dieta importada + treino sem carga
+- Execução do treino simplificada para apenas marcar cada série como concluída.
+- Controle de carga e repetições removido da interface; dados antigos continuam preservados para compatibilidade.
+- Métrica de volume em kg substituída por séries concluídas na semana.
+- Importação de dieta em CSV e JSON.
+- Plano alimentar importado fica salvo localmente e aparece na aba Nutri.
+- Refeições expansíveis com horário, alimentos, quantidades, calorias e macros.
+- Dieta pode ser atualizada ou removida pelo próprio app.
+- Cache PWA atualizado para a nova release.
+
 ## 1.2.0 — Treino rápido + importação
 - Registro por série simplificado para carga, repetições e check de conclusão.
 - RIR e dor deixam de ser exigidos em cada série; dados antigos continuam compatíveis.

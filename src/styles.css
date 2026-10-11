@@ -66,3 +66,25 @@ body{background:radial-gradient(circle at 80% -10%,rgba(155,225,93,.16),transpar
 .saved-main span{display:flex;flex-direction:column;gap:4px}.saved-main small{color:#788389}.saved-main i{font-style:normal;color:var(--accent);font-size:24px}
 .delete-workout{border:1px solid #382629;background:#160d0f;color:#fda4af;border-radius:14px;font-size:24px}
 .primary:disabled{opacity:.45}
+
+/* TrekFit Coach v1.3 — check simples + plano alimentar importado */
+.set-checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+.series-check{border:1px solid #2a3135;background:#0b0e10;color:#c7d0d4;border-radius:14px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;font-weight:800}
+.series-check b{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#20262a;color:#879197}
+.series-check.done{border-color:rgba(155,225,93,.34);background:rgba(155,225,93,.08);color:#fff}
+.series-check.done b{background:var(--accent);color:#071006}
+.diet-title{margin:-8px 0 18px!important;color:#aab4b9!important;font-size:14px!important;font-weight:700}
+.meal-heading{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.meal-heading>span{font-size:11px;color:#7d878d}
+.meal-list.detailed{gap:12px}
+.meal-card.detailed{display:block;padding:0;overflow:hidden}
+.meal-card.detailed.open{border-color:rgba(155,225,93,.22)}
+.meal-summary{width:100%;border:0;background:transparent;color:#fff;padding:16px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.meal-summary div{min-width:0}.meal-summary small{color:#7d878d}.meal-summary h3{margin:4px 0;font-size:18px}.meal-summary p{margin:0;color:var(--accent);font-size:11px;line-height:1.45}
+.meal-summary>span{color:var(--accent);font-size:20px}
+.food-list{border-top:1px solid #242a2e;padding:0 16px}
+.food-row{display:flex;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid #20262a}
+.food-row:last-child{border-bottom:0}.food-row>div{display:flex;flex-direction:column;gap:3px}.food-row small{color:#7d878d;font-size:10px;line-height:1.35}
+.food-macros{text-align:right;align-items:flex-end}.food-macros b{font-size:12px;color:#dce3e5}.food-macros small{white-space:nowrap}
+.text-danger{width:100%;margin-top:12px;border:0;background:transparent;color:#fda4af;padding:8px;font-weight:800}
+@media (max-width:390px){.set-checklist{grid-template-columns:1fr}.food-row{flex-direction:column}.food-macros{text-align:left;align-items:flex-start}}
