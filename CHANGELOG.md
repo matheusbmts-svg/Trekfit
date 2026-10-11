@@ -1,5 +1,12 @@
 # Changelog — TrekFit Coach
 
+## 1.4.0 — Meta nutricional editável
+- Meta diária de calorias agora pode ser editada diretamente na aba Nutri.
+- Proteína, carboidrato e gordura também podem ser ajustados e ficam salvos no aparelho.
+- Meta diária foi separada do total calórico do plano alimentar importado.
+- Comparação visual entre calorias do plano e meta diária.
+- Cache PWA atualizado para a nova release.
+
 ## 1.3.0 — Dieta importada + treino sem carga
 - Execução do treino simplificada para apenas marcar cada série como concluída.
 - Controle de carga e repetições removido da interface; dados antigos continuam preservados para compatibilidade.
